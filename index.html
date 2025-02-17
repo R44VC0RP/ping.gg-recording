@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Recorder</title>
+    <style>
+        :root {
+            --background: #ffffff;
+            --foreground: #020817;
+            --muted: #f1f5f9;
+            --muted-foreground: #64748b;
+            --popover: #ffffff;
+            --popover-foreground: #020817;
+            --card: #ffffff;
+            --card-foreground: #020817;
+            --border: #e2e8f0;
+            --input: #e2e8f0;
+            --primary: #0f172a;
+            --primary-foreground: #f8fafc;
+            --secondary: #f1f5f9;
+            --secondary-foreground: #0f172a;
+            --accent: #DB1D71;
+            --accent-foreground: #ffffff;
+            --destructive: #ef4444;
+            --destructive-foreground: #f8fafc;
+            --ring: #94a3b8;
+            --radius: 0.375rem;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--muted);
+            color: var(--foreground);
+            line-height: 1.5;
+            margin: 0;
+            padding: 0.375rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 1rem auto;
+
+            padding: 1rem;
+
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #d0d7de;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #24292f;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+            gap: 0;
+        }
+
+        .tab {
+            padding: 0.5rem 1rem;
+            font-size: 14px;
+            color: #24292f;
+            cursor: pointer;
+            border: none;
+            margin-bottom: -1px;
+            background: transparent;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .tab:hover {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 2px solid var(--accent);
+            opacity: 0.8;
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom: 2px solid var(--accent);
+            font-weight: 600;
+        }
+
+        .streams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stream-card {
+            background: #ffffff;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+            box-shadow: 0 1px 0 rgba(27, 31, 36, 0.04);
+            transition: border-color 0.2s ease;
+        }
+
+        .stream-card:hover {
+            border-color: var(--accent);
+        }
+
+        .stream-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .stream-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #24292f;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .timer {
+            font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            color: #57606a;
+            background: #f6f8fa;
+            padding: 2px 6px;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+            font-weight: 500;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            padding: 0 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #f6f8fa;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            height: 24px;
+        }
+
+        .status.recording {
+            background: #dafbe1;
+            color: #1a7f37;
+            border-color: rgba(26, 127, 55, 0.15);
+        }
+
+        .status.error {
+            background: #ffebe9;
+            color: #cf222e;
+            border-color: rgba(207, 34, 46, 0.15);
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .form-group {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #f6f8fa;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="url"] {
+            height: 32px;
+            padding: 0 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #24292f;
+            font-size: 14px;
+            line-height: 20px;
+            width: 100%;
+        }
+
+        .form-group input[type="text"]:focus,
+        .form-group input[type="url"]:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(219, 29, 113, 0.2);
+        }
+
+        #streams-tab,
+        #recordings-tab {
+            background: #ffffff;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .recordings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .recordings-table th {
+            text-align: left;
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--muted-foreground);
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        .recordings-table td {
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        .recording-thumbnail {
+            width: 100px;
+            height: 56px;
+            background: var(--muted);
+            border-radius: calc(var(--radius) * 0.75);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .recording-duration {
+            position: absolute;
+            bottom: 0.25rem;
+            right: 0.25rem;
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: 0.125rem 0.25rem;
+            border-radius: calc(var(--radius) * 0.5);
+            font-size: 0.625rem;
+        }
+
+        .recording-title {
+            font-weight: 500;
+            color: var(--foreground);
+            margin-bottom: 0.125rem;
+            font-size: 0.875rem;
+        }
+
+        .recording-date {
+            color: var(--muted-foreground);
+            font-size: 0.75rem;
+        }
+
+        .recording-metadata {
+            font-size: 0.75rem;
+            color: var(--muted-foreground);
+            line-height: 1.3;
+        }
+
+        .recording-metadata div {
+            margin-bottom: 0.125rem;
+        }
+
+        .recording-metadata-edit {
+            display: none;
+            margin-top: 0.5rem;
+        }
+
+        .recording-metadata-edit.active {
+            display: block;
+        }
+
+        .recording-metadata-edit input,
+        .recording-metadata-edit textarea {
+            width: 100%;
+            margin-bottom: 0.5rem;
+            padding: 0.375rem 0.5rem;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 12px;
+            background: #ffffff;
+        }
+
+        .recording-metadata-edit textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+
+        .recording-preview-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 1000;
+            padding: 2rem;
+        }
+
+        .recording-preview-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .recording-preview-content {
+            background: #ffffff;
+            border-radius: 8px;
+            max-width: 900px;
+            width: 100%;
+            position: relative;
+        }
+
+        .recording-preview-header {
+            padding: 1rem;
+            border-bottom: 1px solid #d0d7de;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .recording-preview-body {
+            padding: 1rem;
+        }
+
+        .recording-preview-video {
+            width: 100%;
+            border-radius: 6px;
+            background: #000;
+        }
+
+        .recording-preview-close {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            color: #57606a;
+            padding: 0.5rem;
+            cursor: pointer;
+        }
+
+        .recording-preview-close:hover {
+            color: #24292f;
+        }
+
+        .recording-actions {
+            display: flex;
+            gap: 0.375rem;
+        }
+
+        .recording-actions button {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        button {
+            appearance: none;
+            background-color: #FAFBFC;
+            border: 1px solid rgba(27, 31, 35, 0.15);
+            border-radius: 6px;
+            box-shadow: rgba(27, 31, 35, 0.04) 0 1px 0, rgba(255, 255, 255, 0.25) 0 1px 0 inset;
+            box-sizing: border-box;
+            color: #24292E;
+            cursor: pointer;
+            display: inline-block;
+            font-family: -apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 20px;
+            list-style: none;
+            padding: 6px 16px;
+            position: relative;
+            transition: background-color 0.2s cubic-bezier(0.3, 0, 0.5, 1);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            vertical-align: middle;
+            white-space: nowrap;
+            word-wrap: break-word;
+        }
+
+        button:hover {
+            background-color: #F3F4F6;
+            text-decoration: none;
+            transition-duration: 0.1s;
+        }
+
+        button:disabled {
+            background-color: #FAFBFC;
+            border-color: rgba(27, 31, 35, 0.15);
+            color: #959DA5;
+            cursor: default;
+        }
+
+        button:active {
+            background-color: #EDEFF2;
+            box-shadow: rgba(225, 228, 232, 0.2) 0 1px 0 inset;
+            transition: none 0s;
+        }
+
+        button:focus {
+            outline: 1px transparent;
+        }
+
+        button.primary {
+            background-color: var(--accent);
+            color: var(--accent-foreground);
+            border-color: rgba(219, 29, 113, 0.15);
+        }
+
+        button.primary:hover {
+            background-color: rgba(219, 29, 113, 0.9);
+        }
+
+        button.primary:active {
+            background-color: rgba(219, 29, 113, 0.8);
+        }
+
+        button.danger {
+            background-color: #cf222e;
+            color: #ffffff;
+            border-color: rgba(27, 31, 35, 0.15);
+        }
+
+        button.danger:hover {
+            background-color: #bf2028;
+        }
+
+        button.danger:active {
+            background-color: #b21d25;
+        }
+
+        .global-controls {
+            display: flex;
+            gap: 0.375rem;
+        }
+
+        .global-controls button {
+            height: 1.75rem;
+            padding: 0 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .preview-container {
+            position: relative;
+            padding-top: 56.25%;
+            background: #f6f8fa;
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 0.75rem 0;
+            border: 1px solid #d0d7de;
+        }
+
+        .preview-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 style="display: flex; align-items: center; gap: 0.5rem;"
+            ><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 150" fill="currentColor" style="width: 60px;"><path d="M231.53,25.79A16.71,16.71,0,0,1,248.24,42.5v65a16.71,16.71,0,0,1-16.71,16.71H134.64a15.5,15.5,0,0,1-31,0H28.47A16.71,16.71,0,0,1,11.76,107.5v-65A16.71,16.71,0,0,1,28.47,25.79H231.53m0-9.76H28.47A26.49,26.49,0,0,0,2,42.5v65A26.49,26.49,0,0,0,28.47,134H96a25.25,25.25,0,0,0,46.33,0h89.23A26.49,26.49,0,0,0,258,107.5v-65A26.49,26.49,0,0,0,231.53,16ZM102.8,98.32a8.84,8.84,0,0,1-17.68,0V68.67a8.84,8.84,0,1,1,17.68,0Zm64.92-1.53a10.38,10.38,0,0,1-10.41,10.33h-.92a10.36,10.36,0,0,1-8.35-4.21l-.11-.16L128,73.93v50a8.84,8.84,0,0,1-17.68,0V52.52a10.39,10.39,0,0,1,10.34-10.41h1a10.6,10.6,0,0,1,8.44,4.37l.18.24L150,75.3v-7a8.84,8.84,0,1,1,17.68,0Zm63.81-3.68a10.49,10.49,0,0,1-5.9,9.55,44.41,44.41,0,0,1-19.93,4.84c-19,0-32.27-13.49-32.27-32.81,0-19.1,13.48-33,32-33A38.68,38.68,0,0,1,227.34,48a8.6,8.6,0,0,1,4.12,7.34,8.44,8.44,0,0,1-8.57,8.49,8.89,8.89,0,0,1-4-1l-.33-.18a22.67,22.67,0,0,0-12.31-3.55c-9.48,0-15.14,5.8-15.14,15.52s6,15.53,15.52,15.53a22.73,22.73,0,0,0,8.08-1.45V83.64h-7.31a8.49,8.49,0,1,1,0-17H222.5a8.93,8.93,0,0,1,9,9ZM74.62,49.56C70,44.87,63.34,42.5,54.76,42.5H37.27a8.84,8.84,0,0,0-8.8,8.87V98.32a8.84,8.84,0,0,0,17.67,0V87.25h8.62c8.58,0,15.26-2.38,19.87-7.07a21.62,21.62,0,0,0,6-15.31A21.6,21.6,0,0,0,74.62,49.56ZM53.85,71.8H46.14V58h7.71c8.6,0,8.6,4.68,8.6,6.92S62.45,71.8,53.85,71.8Z"></path></svg>
+                Stream Recorder</h1>
+            <div class="global-controls">
+                <button class="primary" onclick="startAllStreams()">Start All Streams</button>
+                <button class="danger" onclick="stopAllStreams()">Stop All Streams</button>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('streams')">Active Streams</div>
+            <div class="tab" onclick="showTab('recordings')">Recordings</div>
+        </div>
+
+        <div id="streams-tab">
+            <div class="form-group">
+                <input type="text" id="streamName" placeholder="Stream name">
+                <input type="url" id="streamUrl" placeholder="Stream URL">
+                <button class="primary" onclick="addStream()">Add</button>
+            </div>
+
+            <div id="streamList" class="streams-grid"></div>
+        </div>
+
+        <div id="recordings-tab" style="display: none;">
+            <h2>Recorded Files</h2>
+            <div id="recordingsList"></div>
+        </div>
+    </div>
+
+    <div class="recording-preview-modal" id="preview-modal">
+        <div class="recording-preview-content">
+            <div class="recording-preview-header">
+                <h3 class="recording-title" id="preview-title"></h3>
+                <button class="recording-preview-close" onclick="closePreview()">×</button>
+            </div>
+            <div class="recording-preview-body">
+                <video id="preview-video" class="recording-preview-video" controls>
+                    <source type="video/webm">
+                </video>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let streams = [];
+        let activeTimers = new Map();
+
+        // Load saved streams on startup
+        fetch('/config')
+            .then(res => res.json())
+            .then(config => {
+                config.streams.forEach(stream => addSavedStream(stream));
+            });
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tab:nth-child(${tabName === 'streams' ? 1 : 2})`).classList.add('active');
+
+            document.getElementById('streams-tab').style.display = tabName === 'streams' ? 'block' : 'none';
+            document.getElementById('recordings-tab').style.display = tabName === 'recordings' ? 'block' : 'none';
+
+            // Update URL hash without triggering the hashchange event
+            const currentHash = window.location.hash.slice(1);
+            if (currentHash !== tabName) {
+                history.pushState(null, '', `#${tabName}`);
+            }
+
+            if (tabName === 'recordings') {
+                loadRecordings();
+            }
+        }
+
+        // Handle URL hash changes
+        window.addEventListener('hashchange', () => {
+            const hash = window.location.hash.slice(1);
+            if (hash === 'recordings' || hash === 'streams') {
+                showTab(hash);
+            }
+        });
+
+        // Check hash on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const hash = window.location.hash.slice(1);
+            showTab(hash === 'recordings' ? 'recordings' : 'streams');
+        });
+
+        function formatDuration(ms) {
+            const seconds = Math.floor((ms / 1000) % 60);
+            const minutes = Math.floor((ms / (1000 * 60)) % 60);
+            const hours = Math.floor(ms / (1000 * 60 * 60));
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function formatFileSize(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let size = bytes;
+            let unitIndex = 0;
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            return `${size.toFixed(1)} ${units[unitIndex]}`;
+        }
+
+        function startTimer(streamId) {
+            const timerEl = document.getElementById(`timer-${streamId}`);
+            const startTime = Date.now();
+
+            const timer = setInterval(() => {
+                const duration = Date.now() - startTime;
+                timerEl.textContent = formatDuration(duration);
+            }, 1000);
+
+            activeTimers.set(streamId, timer);
+        }
+
+        function stopTimer(streamId) {
+            const timer = activeTimers.get(streamId);
+            if (timer) {
+                clearInterval(timer);
+                activeTimers.delete(streamId);
+            }
+        }
+
+        async function addStream() {
+            const nameInput = document.getElementById('streamName');
+            const urlInput = document.getElementById('streamUrl');
+            const name = nameInput.value.trim();
+            const url = urlInput.value.trim();
+
+            if (!url) return;
+
+            try {
+                const response = await fetch('/config/streams', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, name })
+                });
+
+                if (!response.ok) throw new Error('Failed to save stream');
+
+                const stream = await response.json();
+                addSavedStream(stream);
+
+                nameInput.value = '';
+                urlInput.value = '';
+            } catch (error) {
+                console.error('Error saving stream:', error);
+            }
+        }
+
+        function addSavedStream(stream) {
+            streams.push(stream);
+            renderStreams();
+        }
+
+        function renderStreams() {
+            const list = document.getElementById('streamList');
+            list.innerHTML = streams.map(stream => `
+                <div class="stream-card" id="stream-${stream.id}">
+                    <div class="stream-header">
+                        <div class="stream-title">${stream.name || 'Untitled Stream'}</div>
+                        <div class="timer" id="timer-${stream.id}">00:00:00</div>
+                    </div>
+                    <div class="preview-container">
+                        <iframe src="${stream.url}" 
+                            allowfullscreen 
+                            allow="autoplay; fullscreen" 
+                            muted="true"
+                            loading="lazy"></iframe>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div class="status" id="status-${stream.id}">Ready</div>
+                        <div class="controls-row" style="margin: 0; flex: 1; justify-content: flex-end;">
+                            <button class="success" onclick="startRecording('${stream.id}', '${stream.url}')" id="start-${stream.id}">Record</button>
+                            <button class="danger" onclick="stopRecording('${stream.id}')" id="stop-${stream.id}" style="display: none;">Stop</button>
+                            <button class="danger" onclick="removeStream('${stream.id}')" id="remove-${stream.id}">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function startRecording(streamId, url) {
+            const statusEl = document.getElementById(`status-${streamId}`);
+            const startBtn = document.getElementById(`start-${streamId}`);
+            const stopBtn = document.getElementById(`stop-${streamId}`);
+
+            try {
+                statusEl.textContent = 'Starting recording...';
+                const response = await fetch('/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                if (!response.ok) throw new Error('Failed to start recording');
+
+                const { streamId: recordingId } = await response.json();
+
+                // Store the recording ID in the stop button's data attribute
+                stopBtn.dataset.recordingId = recordingId;
+
+                statusEl.textContent = 'Recording...';
+                statusEl.className = 'status recording';
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+
+                startTimer(streamId);
+            } catch (error) {
+                statusEl.textContent = `Error: ${error.message}`;
+                statusEl.className = 'status error';
+            }
+        }
+
+        async function stopRecording(streamId) {
+            const statusEl = document.getElementById(`status-${streamId}`);
+            const startBtn = document.getElementById(`start-${streamId}`);
+            const stopBtn = document.getElementById(`stop-${streamId}`);
+
+            try {
+                // Get the recording ID from the stop button's data attribute
+                const recordingId = stopBtn.dataset.recordingId;
+
+                await fetch('/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ streamId: recordingId })
+                });
+
+                statusEl.textContent = 'Ready';
+                statusEl.className = 'status';
+                startBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+
+                stopTimer(streamId);
+            } catch (error) {
+                statusEl.textContent = `Error: ${error.message}`;
+                statusEl.className = 'status error';
+            }
+        }
+
+        async function removeStream(streamId) {
+            if (!confirm('Are you sure you want to remove this stream?')) return;
+
+            try {
+                const response = await fetch(`/config/streams/${streamId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete stream');
+
+                streams = streams.filter(s => s.id !== streamId);
+                renderStreams();
+            } catch (error) {
+                console.error('Error removing stream:', error);
+                alert('Failed to remove stream');
+            }
+        }
+
+        async function loadRecordings() {
+            try {
+                const response = await fetch('/recordings');
+                const recordings = await response.json();
+
+                const list = document.getElementById('recordingsList');
+                list.innerHTML = `
+                    <table class="recordings-table">
+                        <thead>
+                            <tr>
+                                <th>Preview</th>
+                                <th>Name</th>
+                                <th>Info</th>
+                                <th>Size</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${recordings.map(recording => `
+                                <tr>
+                                    <td>
+                                        <div class="recording-thumbnail">
+                                            <video>
+                                                <source src="${recording.url}" type="video/webm">
+                                            </video>
+                                            ${recording.metadata?.duration ? `
+                                                <div class="recording-duration">${formatDuration(recording.metadata.duration * 1000)}</div>
+                                            ` : ''}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="recording-title">${recording.name}</div>
+                                        <div class="recording-date">${new Date(recording.createdAt).toLocaleString()}</div>
+                                    </td>
+                                    <td>
+                                        ${recording.metadata ? `
+                                            <div class="recording-metadata">
+                                                ${recording.metadata.duration ? `
+                                                <div><strong>Duration:</strong> ${formatDuration(recording.metadata.duration * 1000)}</div>
+                                                ` : ''}
+                                                <div><strong>Resolution:</strong> ${recording.metadata.video?.width}x${recording.metadata.video?.height}</div>
+                                                <div><strong>FPS:</strong> ${Math.round(recording.metadata.video?.fps || 0)}</div>
+                                                <div><strong>Video:</strong> ${formatBitrate(recording.metadata.video?.bitrate)} (${recording.metadata.video?.codec})</div>
+                                                <div><strong>Audio:</strong> ${formatBitrate(recording.metadata.audio?.bitrate)} (${recording.metadata.audio?.codec})</div>
+                                                ${recording.metadata.notes ? `<div><strong>Notes:</strong> ${recording.metadata.notes}</div>` : ''}
+                                                ${recording.metadata.tags ? `<div><strong>Tags:</strong> ${recording.metadata.tags}</div>` : ''}
+                                            </div>
+                                            <div class="recording-metadata-edit" id="metadata-edit-${recording.name}">
+                                                <input type="text" placeholder="Tags (comma separated)" 
+                                                    value="${recording.metadata.tags || ''}" 
+                                                    onchange="updateMetadata('${recording.name}', 'tags', this.value)">
+                                                <textarea placeholder="Notes"
+                                                    onchange="updateMetadata('${recording.name}', 'notes', this.value)">${recording.metadata.notes || ''}</textarea>
+                                            </div>
+                                        ` : 'No metadata available'}
+                                    </td>
+                                    <td>${formatFileSize(recording.size)}</td>
+                                    <td>
+                                        <div class="recording-actions">
+                                            <button onclick="previewRecording('${recording.name}', '${recording.url}')" class="primary">Preview</button>
+                                            <button onclick="toggleMetadataEdit('${recording.name}')" class="primary">Edit Info</button>
+                                            <button onclick="downloadAsMP4('${recording.name}')" class="success">Download MP4</button>
+                                            <button onclick="deleteRecording('${recording.name}')" class="danger">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                // Initialize video thumbnails
+                document.querySelectorAll('.recording-thumbnail video').forEach(video => {
+                    video.addEventListener('loadeddata', () => {
+                        video.currentTime = 1; // Set thumbnail to 1 second into video
+                    });
+                });
+            } catch (error) {
+                console.error('Error loading recordings:', error);
+            }
+        }
+
+        async function deleteRecording(filename) {
+            if (!confirm('Are you sure you want to delete this recording?')) return;
+
+            try {
+                const response = await fetch(`/recordings/${filename}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete recording');
+
+                // Refresh the recordings list
+                loadRecordings();
+            } catch (error) {
+                console.error('Error deleting recording:', error);
+                alert('Failed to delete recording');
+            }
+        }
+
+        async function startAllStreams() {
+            const readyStreams = streams.filter(stream => {
+                const statusEl = document.getElementById(`status-${stream.id}`);
+                return statusEl.textContent === 'Ready';
+            });
+
+            // Start all streams in parallel
+            await Promise.all(readyStreams.map(stream =>
+                startRecording(stream.id, stream.url)
+            ));
+        }
+
+        async function stopAllStreams() {
+            for (const stream of streams) {
+                const statusEl = document.getElementById(`status-${stream.id}`);
+                if (statusEl.classList.contains('recording')) {
+                    await stopRecording(stream.id);
+                }
+            }
+        }
+
+        function formatBitrate(bitsPerSecond) {
+            if (!bitsPerSecond) return 'N/A';
+            const mbps = Math.round(bitsPerSecond / 1000000);
+            return `${mbps} Mbps`;
+        }
+
+        async function downloadAsMP4(filename) {
+            try {
+                const response = await fetch(`/recordings/${filename}/convert`);
+                if (!response.ok) throw new Error('Conversion failed');
+
+                const { url } = await response.json();
+
+                // Create a temporary link and click it to start the download
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename.replace('.webm', '.mp4');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (error) {
+                console.error('Error converting to MP4:', error);
+                alert('Failed to convert to MP4');
+            }
+        }
+
+        function toggleMetadataEdit(filename) {
+            const editDiv = document.getElementById(`metadata-edit-${filename}`);
+            editDiv.classList.toggle('active');
+        }
+
+        async function updateMetadata(filename, field, value) {
+            try {
+                const response = await fetch(`/recordings/${filename}/metadata`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [field]: value })
+                });
+
+                if (!response.ok) throw new Error('Failed to update metadata');
+                
+                // Refresh the recordings list to show updated metadata
+                loadRecordings();
+            } catch (error) {
+                console.error('Error updating metadata:', error);
+                alert('Failed to update metadata');
+            }
+        }
+
+        function previewRecording(filename, url) {
+            const modal = document.getElementById('preview-modal');
+            const video = document.getElementById('preview-video');
+            const title = document.getElementById('preview-title');
+
+            title.textContent = filename;
+            video.querySelector('source').src = url;
+            video.load();
+            
+            modal.classList.add('active');
+            video.play();
+        }
+
+        function closePreview() {
+            const modal = document.getElementById('preview-modal');
+            const video = document.getElementById('preview-video');
+            
+            video.pause();
+            modal.classList.remove('active');
+        }
+
+        // Close preview modal when clicking outside
+        document.getElementById('preview-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'preview-modal') {
+                closePreview();
+            }
+        });
+    </script>
+</body>
+
+</html>
