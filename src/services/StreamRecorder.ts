@@ -32,6 +32,7 @@ export class StreamRecorder {
     }
 
     private updateStatus(status: string) {
+        console.log(`[StreamRecorder] ${status}`);
         this.onStatusChange?.(status);
     }
 
@@ -40,6 +41,8 @@ export class StreamRecorder {
 
         try {
             this.updateStatus("Starting browser...");
+            
+            // Simplified launch configuration matching the docs
             this.browser = await launch({
                 executablePath: process.platform === 'darwin' 
                     ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
@@ -52,30 +55,46 @@ export class StreamRecorder {
             });
 
             this.page = await this.browser.newPage();
-            this.updateStatus("Navigating to stream...");
             
+            this.updateStatus("Navigating to stream...");
             await this.page.goto(this.url, {
                 waitUntil: 'networkidle0',
                 timeout: 60000
             });
-            this.updateStatus("Stream page loaded");
 
-            const outputFile = path.join(RECORDINGS_DIR, `stream_${Date.now()}.webm`);
-            this.file = fs.createWriteStream(outputFile);
+            const timestamp = new Date().toISOString()
+                .replace(/[:.]/g, '-')
+                .replace('T', '_')
+                .slice(0, -5);
+            
+            const outputPath = path.join(RECORDINGS_DIR, `stream_${timestamp}.webm`);
+            this.file = fs.createWriteStream(outputPath);
 
             this.updateStatus("Setting up stream capture...");
+
+            // Simplified stream configuration matching the docs
             this.stream = await getStream(this.page, { 
                 audio: true, 
-                video: true,
-                audioBitsPerSecond: 192000,  // 192 kbps
-                videoBitsPerSecond: 8000000  // 8 Mbps
+                video: true
+            });
+
+            // Add error handlers
+            this.stream.on('error', (error: Error) => {
+                console.error('[StreamRecorder] Stream error:', error);
+                this.onError?.(error);
+            });
+
+            this.file.on('error', (error: Error) => {
+                console.error('[StreamRecorder] File write error:', error);
+                this.onError?.(error);
             });
             
             this.stream.pipe(this.file);
             this.isRecording = true;
-            this.updateStatus("Recording...");
+            this.updateStatus("Recording started");
 
         } catch (error) {
+            console.error('[StreamRecorder] Start error:', error);
             this.onError?.(error as Error);
             this.updateStatus("Error starting recording");
             await this.stop();
@@ -94,18 +113,18 @@ export class StreamRecorder {
             }
 
             if (this.file) {
-                this.file.close();
+                this.file.end();
             }
 
             if (this.browser) {
                 await this.browser.close();
             }
 
-            // Close the WebSocket server
             await wss.then(ws => ws.close());
-
             this.updateStatus("Recording stopped");
+
         } catch (error) {
+            console.error('[StreamRecorder] Stop error:', error);
             this.onError?.(error as Error);
             this.updateStatus("Error stopping recording");
         }
