@@ -17,68 +17,32 @@ git clone <repository-url>
 cd stream-recorder
 ```
 
-2. Create a development config:
+2. Run the development script:
 ```bash
-cp template_config.json config.json
+./dev.sh
 ```
 
-3. Build and run the development container:
-```bash
-# Build the image
-docker build -t stream-recorder-dev .
-
-# Run with mounted volumes for development
-docker run -p 3000:3000 \
-  -v $(pwd)/recordings:/usr/src/app/recordings \
-  -v $(pwd)/config.json:/usr/src/app/config.json \
-  --name stream-recorder-dev \
-  stream-recorder-dev
-```
-
-The development setup includes:
-- Hot-reloading of recordings directory
-- Persistent config.json for stream settings
-- Port 3000 exposed for local access
+This script will:
+- Create config.json from template if it doesn't exist
+- Create the recordings directory
+- Build the development Docker image
+- Start the container with appropriate volumes
+- Provide access to the application at http://localhost:3000
 
 ### Production
 
-1. Build the production image:
+1. Deploy using the production script:
 ```bash
-docker build -t stream-recorder-prod .
+./prod.sh
 ```
 
-2. Run the production container:
-```bash
-docker run -d \
-  -p 3000:3000 \
-  -v /path/to/recordings:/usr/src/app/recordings \
-  -v /path/to/config.json:/usr/src/app/config.json \
-  --restart unless-stopped \
-  --name stream-recorder \
-  stream-recorder-prod
-```
-
-### Docker Compose (Recommended for Production)
-
-Create a `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-services:
-  stream-recorder:
-    build: .
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./recordings:/usr/src/app/recordings
-      - ./config.json:/usr/src/app/config.json
-    restart: unless-stopped
-```
-
-Run with:
-```bash
-docker-compose up -d
-```
+This script will:
+- Check for Docker installation
+- Set up necessary directories and configurations
+- Build the production Docker image
+- Start the container with proper settings
+- Verify the deployment
+- Display useful commands and container logs
 
 ## Configuration
 
