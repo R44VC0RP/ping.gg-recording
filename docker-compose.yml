@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  stream-recorder:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./recordings:/usr/src/app/recordings
+      - ./config.json:/usr/src/app/config.json
+    restart: unless-stopped
+    # Uncomment the following lines for resource limits in production
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 2G
+    #     reservations:
+    #       cpus: '1'
+    #       memory: 1G 
