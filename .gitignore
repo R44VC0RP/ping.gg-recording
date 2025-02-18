@@ -29,3 +29,6 @@ recordings/
 # OS
 .DS_Store
 Thumbs.db
+
+# Config
+config.json

@@ -73,6 +73,31 @@ app.delete('/config/streams/:id', (req, res) => {
     res.json({ success: true });
 });
 
+// Add endpoint for updating stream URL
+app.patch('/config/streams/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { url } = req.body;
+        
+        // Find and update the stream
+        const streamIndex = config.streams.findIndex(s => s.id === id);
+        if (streamIndex === -1) {
+            return res.status(404).json({ error: 'Stream not found' });
+        }
+        
+        // Update the URL
+        config.streams[streamIndex].url = url;
+        
+        // Save the updated config
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 4));
+        
+        res.json(config.streams[streamIndex]);
+    } catch (error) {
+        console.error('Error updating stream URL:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Add function to get video metadata
 async function getVideoMetadata(filePath) {
     try {
@@ -127,12 +152,12 @@ async function saveMetadata(filename, metadata) {
     await fs.promises.writeFile(metaPath, JSON.stringify(metadata, null, 2));
 }
 
-// Update the recordings endpoint to include custom metadata
+// Update the recordings endpoint to only show MP4 files
 app.get('/recordings', async (req, res) => {
     try {
         const files = await Promise.all(
             fs.readdirSync(RECORDINGS_DIR)
-                .filter(file => file.endsWith('.webm'))
+                .filter(file => file.endsWith('.mp4'))
                 .map(async file => {
                     const filePath = join(RECORDINGS_DIR, file);
                     const stats = fs.statSync(filePath);
@@ -149,8 +174,7 @@ app.get('/recordings', async (req, res) => {
                         size: stats.size,
                         createdAt: stats.birthtime,
                         url: `/recordings/${file}`,
-                        metadata,
-                        mp4Url: `/recordings/${file.replace('.webm', '.mp4')}`
+                        metadata
                     };
                 })
         );
@@ -190,7 +214,7 @@ app.post('/recordings/:filename/metadata', async (req, res) => {
     }
 });
 
-// Update delete endpoint to also remove metadata file
+// Remove the /convert endpoint since we're auto-converting
 app.delete('/recordings/:filename', async (req, res) => {
     try {
         const { filename } = req.params;
@@ -211,33 +235,6 @@ app.delete('/recordings/:filename', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Error deleting recording:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Add endpoint for MP4 conversion
-app.get('/recordings/:filename/convert', async (req, res) => {
-    try {
-        const { filename } = req.params;
-        const webmPath = join(RECORDINGS_DIR, filename);
-        const mp4Path = join(RECORDINGS_DIR, filename.replace('.webm', '.mp4'));
-        
-        // Check if file exists and is within recordings directory
-        if (!fs.existsSync(webmPath) || !webmPath.startsWith(RECORDINGS_DIR)) {
-            return res.status(404).json({ error: 'Recording not found' });
-        }
-        
-        // Check if MP4 already exists
-        if (fs.existsSync(mp4Path)) {
-            return res.json({ url: `/recordings/${filename.replace('.webm', '.mp4')}` });
-        }
-        
-        // Convert to MP4 using high quality settings
-        await execAsync(`ffmpeg -i "${webmPath}" -c:v libx264 -preset slow -crf 17 -c:a aac -b:a 192k "${mp4Path}"`);
-        
-        res.json({ url: `/recordings/${filename.replace('.webm', '.mp4')}` });
-    } catch (error) {
-        console.error('Error converting to MP4:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -279,14 +276,20 @@ app.post('/start', async (req, res) => {
 
         log('Launching browser...');
         const browser = await launch({
-            executablePath: process.platform === 'darwin' 
-                ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-                : undefined,
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 
+                (process.platform === 'darwin' 
+                    ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                    : undefined),
             defaultViewport: {
                 width: config.settings.defaultVideoQuality.width,
                 height: config.settings.defaultVideoQuality.height,
             },
-            headless: "new"
+            headless: "new",
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage'
+            ]
         });
 
         log('Opening page and navigating to URL...');
@@ -387,7 +390,7 @@ app.post('/stop', async (req, res) => {
             return res.status(404).json({ error: 'Recording not found' });
         }
 
-        const { browser, stream, fileStream, page, startTime } = recorder;
+        const { browser, stream, fileStream, page, startTime, outputFile } = recorder;
         
         try {
             log('Stopping media stream...');
@@ -419,17 +422,26 @@ app.post('/stop', async (req, res) => {
             
             recorders.delete(streamId);
             
+            // Convert WebM to MP4 automatically after stopping
+            log('Converting WebM to MP4...');
+            const mp4Path = outputFile.replace('.webm', '.mp4');
+            await execAsync(`ffmpeg -i "${outputFile}" -c:v libx264 -preset slow -crf 17 -c:a aac -b:a 192k "${mp4Path}"`);
+            
+            // Delete the original WebM file after successful conversion
+            fs.unlinkSync(outputFile);
+            
             const duration = stopTime - startTime;
-            log(`Recording stopped successfully`, { 
+            log(`Recording stopped and converted successfully`, { 
                 streamId, 
                 duration,
-                fileSize: fs.statSync(recorder.outputFile).size
+                outputFile: mp4Path
             });
             
             res.json({ 
                 success: true,
+                status: 'completed',
                 duration,
-                outputFile: recorder.outputFile
+                outputFile: mp4Path
             });
         } catch (error) {
             log('Error during stop process, attempting cleanup...', { error: error.message });
@@ -451,7 +463,10 @@ app.post('/stop', async (req, res) => {
             stack: error.stack,
             duration: Date.now() - stopTime 
         });
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ 
+            error: error.message,
+            status: 'error'
+        });
     }
 });
 
