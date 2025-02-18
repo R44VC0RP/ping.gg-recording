@@ -101,12 +101,14 @@ When running the container, the following mounts are recommended for proper oper
 #### Mount Details:
 
 1. **recordings/ (Required)**
+
    - Purpose: Stores all recorded videos and their metadata
    - Type: Volume or bind mount
    - Permissions: Read/Write (666)
    - Example: `-v $(pwd)/recordings:/usr/src/app/recordings`
 
 2. **data/ (Required)**
+
    - Purpose: Stores user accounts, authentication data, and app state
    - Type: Volume or bind mount
    - Permissions: Read/Write (666)
@@ -121,6 +123,7 @@ When running the container, the following mounts are recommended for proper oper
 #### Development Mounts:
 
 4. **src/ (Optional)**
+
    - Purpose: Enable live code updates during development
    - Type: Bind mount
    - Example: `-v $(pwd)/src:/usr/src/app/src`
@@ -133,17 +136,20 @@ When running the container, the following mounts are recommended for proper oper
 #### Setting Up Mounts:
 
 1. Create required directories:
+
 ```bash
 mkdir -p recordings data
 ```
 
 2. Set proper permissions:
+
 ```bash
 chmod 666 recordings data
 chmod 666 config.json
 ```
 
 3. Create initial config if needed:
+
 ```bash
 cp template_config.json config.json
 ```
