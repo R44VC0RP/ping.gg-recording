@@ -49,8 +49,7 @@ RUN apt-get update && apt-get install -y \
 
 # Set environment variables for Puppeteer and JWT
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    JWT_SECRET=your-secret-key-change-in-production
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Create app directory
 WORKDIR /usr/src/app

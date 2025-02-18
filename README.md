@@ -83,6 +83,71 @@ This script will:
 - `JWT_SECRET`: Secret key for JWT token generation (required for authentication)
 - `PUPPETEER_EXECUTABLE_PATH`: Path to Chromium executable (default: /usr/bin/chromium)
 
+### Recommended Mounts
+
+When running the container, the following mounts are recommended for proper operation and data persistence:
+
+```bash
+# Required Mounts
+-v $(pwd)/recordings:/usr/src/app/recordings     # Store recorded videos
+-v $(pwd)/data:/usr/src/app/data                # Store user data and app state
+-v $(pwd)/config.json:/usr/src/app/config.json  # Store stream configurations
+
+# Optional Development Mounts
+-v $(pwd)/src:/usr/src/app/src                  # For development: live code updates
+-v $(pwd)/package.json:/usr/src/app/package.json # For development: package management
+```
+
+#### Mount Details:
+
+1. **recordings/ (Required)**
+   - Purpose: Stores all recorded videos and their metadata
+   - Type: Volume or bind mount
+   - Permissions: Read/Write (666)
+   - Example: `-v $(pwd)/recordings:/usr/src/app/recordings`
+
+2. **data/ (Required)**
+   - Purpose: Stores user accounts, authentication data, and app state
+   - Type: Volume or bind mount
+   - Permissions: Read/Write (666)
+   - Example: `-v $(pwd)/data:/usr/src/app/data`
+
+3. **config.json (Required)**
+   - Purpose: Stores stream configurations and app settings
+   - Type: Bind mount
+   - Permissions: Read/Write (666)
+   - Example: `-v $(pwd)/config.json:/usr/src/app/config.json`
+
+#### Development Mounts:
+
+4. **src/ (Optional)**
+   - Purpose: Enable live code updates during development
+   - Type: Bind mount
+   - Example: `-v $(pwd)/src:/usr/src/app/src`
+
+5. **package.json (Optional)**
+   - Purpose: Package management during development
+   - Type: Bind mount
+   - Example: `-v $(pwd)/package.json:/usr/src/app/package.json`
+
+#### Setting Up Mounts:
+
+1. Create required directories:
+```bash
+mkdir -p recordings data
+```
+
+2. Set proper permissions:
+```bash
+chmod 666 recordings data
+chmod 666 config.json
+```
+
+3. Create initial config if needed:
+```bash
+cp template_config.json config.json
+```
+
 ### Volumes
 
 1. **recordings/**: Stores all recorded videos
