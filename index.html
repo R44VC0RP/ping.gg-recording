@@ -984,6 +984,35 @@
             min-width: 1.25rem;
             text-align: center;
         }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--muted);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 0.25rem;
+            border: 1px solid var(--border);
+        }
+
+        .progress-bar .progress {
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.3s ease;
+            border-right: 1px solid var(--border);
+        }
+
+        .conversion-status {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .conversion-status span {
+            font-size: 0.75rem;
+            color: var(--muted-foreground);
+            font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+        }
     </style>
 </head>
 
@@ -1013,7 +1042,8 @@
 
         <div class="tabs">
             <div class="tab active" onclick="showTab('streams')">Active Streams</div>
-            <div class="tab" onclick="showTab('recordings')">Recordings <span class="status" id="recordings-badge">0</span></div>
+            <div class="tab" onclick="showTab('recordings')">Recordings <span class="badge" id="recordings-badge">0</span></div>
+            <div class="tab" onclick="showTab('unprocessed')">To Process <span class="badge" id="unprocessed-badge">0</span></div>
             <div class="tab admin-tab" onclick="showTab('admin')" style="display: none;">Admin</div>
         </div>
 
@@ -1032,6 +1062,11 @@
         <div id="recordings-tab" style="display: none;">
             <h2>Recorded Files</h2>
             <div id="recordingsList"></div>
+        </div>
+
+        <div id="unprocessed-tab" style="display: none;">
+            <h2>Unprocessed Recordings</h2>
+            <div id="unprocessedList"></div>
         </div>
 
         <div id="admin-tab" style="display: none;">
@@ -1126,10 +1161,10 @@
 
         function showTab(tabName) {
             // Default to streams if no tab specified
-            tabName = tabName || 'streams';
+            tabName = tabName || window.location.hash.slice(1) || 'streams';
 
             // Validate tab name
-            if (!['streams', 'recordings', 'admin'].includes(tabName)) {
+            if (!['streams', 'recordings', 'unprocessed', 'admin'].includes(tabName)) {
                 tabName = 'streams';
             }
 
@@ -1142,21 +1177,24 @@
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab:nth-child(${
                 tabName === 'streams' ? 1 : 
-                tabName === 'recordings' ? 2 : 3
+                tabName === 'recordings' ? 2 : 
+                tabName === 'unprocessed' ? 3 : 4
             })`).classList.add('active');
 
             document.getElementById('streams-tab').style.display = tabName === 'streams' ? 'block' : 'none';
             document.getElementById('recordings-tab').style.display = tabName === 'recordings' ? 'block' : 'none';
+            document.getElementById('unprocessed-tab').style.display = tabName === 'unprocessed' ? 'block' : 'none';
             document.getElementById('admin-tab').style.display = tabName === 'admin' ? 'block' : 'none';
 
             // Update URL hash without triggering hashchange event
-            const currentHash = window.location.hash.slice(1);
-            if (currentHash !== tabName) {
-                history.pushState(null, '', `#${tabName}`);
+            if (window.location.hash.slice(1) !== tabName) {
+                history.replaceState(null, '', `#${tabName}`);
             }
 
             if (tabName === 'recordings') {
                 loadRecordings();
+            } else if (tabName === 'unprocessed') {
+                loadUnprocessedRecordings();
             } else if (tabName === 'admin') {
                 loadAdminData();
             }
@@ -1230,7 +1268,7 @@
 
                 // Load initial tab
                 const hash = window.location.hash.slice(1);
-                showTab(hash === 'recordings' ? 'recordings' : 'streams');
+                showTab(hash || 'streams');
             } catch (error) {
                 console.error('Error loading initial data:', error);
             }
@@ -1871,6 +1909,126 @@
             } catch (error) {
                 console.error('Error deleting user:', error);
             }
+        }
+
+        // Add function to load unprocessed recordings
+        async function loadUnprocessedRecordings() {
+            try {
+                const response = await fetch('/recordings/unprocessed');
+                const files = await response.json();
+
+                // Update the unprocessed badge
+                const badge = document.getElementById('unprocessed-badge');
+                badge.textContent = files.length;
+
+                const list = document.getElementById('unprocessedList');
+                list.innerHTML = `
+                    <table class="recordings-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Size</th>
+                                <th>Created</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${files.map(file => `
+                                <tr id="unprocessed-${file.name}">
+                                    <td>${file.name}</td>
+                                    <td>${formatFileSize(file.size)}</td>
+                                    <td>${new Date(file.createdAt).toLocaleString()}</td>
+                                    <td>
+                                        <div class="conversion-status">
+                                            ${file.status === 'converting' ? `
+                                                <div class="progress-bar">
+                                                    <div class="progress" style="width: ${file.progress}%"></div>
+                                                </div>
+                                                <span>${file.progress.toFixed(2)}%</span>
+                                            ` : file.status}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="recording-actions">
+                                            ${file.status === 'pending' ? `
+                                                <button onclick="startConversion('${file.name}')" class="primary">
+                                                    Convert to MP4
+                                                </button>
+                                            ` : ''}
+                                            <button onclick="deleteRecording('${file.name}')" class="danger">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                // Start polling for conversion status for active conversions
+                files.forEach(file => {
+                    if (file.status === 'converting' || file.status === 'queued') {
+                        pollConversionStatus(file.name);
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading unprocessed recordings:', error);
+            }
+        }
+
+        // Add function to start conversion
+        async function startConversion(filename) {
+            try {
+                const response = await fetch('/recordings/convert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename })
+                });
+
+                if (!response.ok) throw new Error('Failed to start conversion');
+
+                // Start polling for status
+                pollConversionStatus(filename);
+                
+                // Refresh the list
+                loadUnprocessedRecordings();
+            } catch (error) {
+                console.error('Error starting conversion:', error);
+                alert('Failed to start conversion');
+            }
+        }
+
+        // Add function to poll conversion status
+        function pollConversionStatus(filename) {
+            const interval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/recordings/convert/status/${filename}`);
+                    const status = await response.json();
+
+                    const row = document.getElementById(`unprocessed-${filename}`);
+                    if (!row) {
+                        clearInterval(interval);
+                        return;
+                    }
+
+                    const statusCell = row.querySelector('.conversion-status');
+                    if (status.status === 'converting') {
+                        statusCell.innerHTML = `
+                            <div class="progress-bar">
+                                <div class="progress" style="width: ${status.progress}%"></div>
+                            </div>
+                            <span>${status.progress.toFixed(2)}%</span>
+                        `;
+                    } else if (status.status === 'pending') {
+                        clearInterval(interval);
+                        loadUnprocessedRecordings();
+                        loadRecordings();
+                    }
+                } catch (error) {
+                    console.error('Error polling conversion status:', error);
+                    clearInterval(interval);
+                }
+            }, 1000);
         }
     </script>
 </body>

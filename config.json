@@ -12,24 +12,14 @@
             "url": "https://ping.gg/embed/rlzexpaetd",
             "name": "Guest",
             "addedAt": "2025-02-18T01:43:36.390Z",
-            "recordingState": {
-                "isRecording": true,
-                "recordingId": "1739849940440",
-                "startTime": 1739849945624,
-                "outputFile": "/Users/ryanvogel/devlocal/ping.gg-recording/recordings/guest_2025-02-18_03-39-00.webm"
-            }
+            "recordingState": null
         },
         {
             "id": "1739843053965",
             "url": "https://ping.gg/embed/nm7dw2hhi4",
             "name": "Ryan Vogel (Host)",
             "addedAt": "2025-02-18T01:44:13.965Z",
-            "recordingState": {
-                "isRecording": true,
-                "recordingId": "1739849940441",
-                "startTime": 1739849945520,
-                "outputFile": "/Users/ryanvogel/devlocal/ping.gg-recording/recordings/ryan_vogel_host_2025-02-18_03-39-00.webm"
-            }
+            "recordingState": null
         }
     ],
     "settings": {

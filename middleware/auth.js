@@ -18,4 +18,4 @@ export const verifyToken = (req, res, next) => {
   }
 };
 
-export const JWT_SECRET_KEY = JWT_SECRET; 
+export const JWT_SECRET_KEY = JWT_SECRET;

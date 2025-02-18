@@ -43,6 +43,10 @@ fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
 // Store active recorders
 const recorders = new Map();
 
+// Add conversion queue and active conversions tracking
+const conversionQueue = new Map();
+const activeConversions = new Map();
+
 app.use(express.json());
 
 // Serve static files
@@ -125,10 +129,50 @@ app.patch('/config/streams/:id', (req, res) => {
 // Add function to get video metadata
 async function getVideoMetadata(filePath) {
   try {
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.error('File does not exist:', filePath);
+      return null;
+    }
+
+    // Check if file is accessible
+    try {
+      await fs.promises.access(filePath, fs.constants.R_OK);
+    } catch (error) {
+      console.error('File is not accessible:', filePath, error);
+      return null;
+    }
+
+    // Get file stats to check size and last modified time
+    const stats = await fs.promises.stat(filePath);
+    if (stats.size === 0) {
+      console.error('File is empty:', filePath);
+      return null;
+    }
+
+    // Check if file was modified in the last second (might still be writing)
+    const lastModified = new Date(stats.mtime).getTime();
+    const now = Date.now();
+    if (now - lastModified < 5000) {
+      console.error('File might still be processing:', filePath);
+      return null;
+    }
+
     const { stdout } = await execAsync(
       `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`
     );
+
+    if (!stdout) {
+      console.error('No output from ffprobe for file:', filePath);
+      return null;
+    }
+
     const metadata = JSON.parse(stdout);
+
+    if (!metadata.streams || !metadata.format) {
+      console.error('Invalid metadata format for file:', filePath);
+      return null;
+    }
 
     const videoStream = metadata.streams.find(s => s.codec_type === 'video');
     const audioStream = metadata.streams.find(s => s.codec_type === 'audio');
@@ -158,6 +202,7 @@ async function getVideoMetadata(filePath) {
     };
   } catch (error) {
     console.error('Error getting video metadata:', error);
+    console.error('File path:', filePath);
     return null;
   }
 }
@@ -195,8 +240,24 @@ app.get('/recordings', async (req, res) => {
           const technicalMetadata = await getVideoMetadata(filePath);
           const customMetadata = await loadMetadata(file);
 
+          // If technical metadata is not available, provide basic metadata
           const metadata = {
-            ...technicalMetadata,
+            ...(technicalMetadata || {
+              duration: null,
+              video: {
+                width: 'Unknown',
+                height: 'Unknown',
+                fps: 'Unknown',
+                codec: 'Unknown',
+                bitrate: null,
+              },
+              audio: {
+                codec: 'Unknown',
+                channels: 'Unknown',
+                sampleRate: null,
+                bitrate: null,
+              },
+            }),
             ...(customMetadata || {}),
           };
 
@@ -285,7 +346,7 @@ function updateStreamRecordingState(streamId, recordingState) {
   if (streamIndex !== -1) {
     config.streams[streamIndex] = {
       ...config.streams[streamIndex],
-      recordingState
+      recordingState,
     };
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 4));
   }
@@ -370,7 +431,7 @@ app.post('/start', async (req, res) => {
       isRecording: true,
       recordingId: streamId,
       startTime: Date.now(),
-      outputFile
+      outputFile,
     });
 
     recorders.set(streamId, {
@@ -411,7 +472,7 @@ app.get('/status/:streamId', (req, res) => {
   if (!stream.recordingState) {
     return res.json({
       streamId,
-      isRecording: false
+      isRecording: false,
     });
   }
 
@@ -421,7 +482,7 @@ app.get('/status/:streamId', (req, res) => {
     updateStreamRecordingState(streamId, null);
     return res.json({
       streamId,
-      isRecording: false
+      isRecording: false,
     });
   }
 
@@ -434,21 +495,82 @@ app.get('/status/:streamId', (req, res) => {
     recordingId: stream.recordingState.recordingId,
     duration,
     fileSize,
-    startTime: stream.recordingState.startTime
+    startTime: stream.recordingState.startTime,
   });
 });
 
+// Add function to start conversion process
+async function startConversion(webmFile) {
+  try {
+    const mp4Path = webmFile.replace('.webm', '.mp4');
+
+    // Get WebM file size
+    const webmSize = fs.statSync(webmFile).size;
+
+    activeConversions.set(webmFile, {
+      startTime: Date.now(),
+      webmSize,
+      mp4Path,
+    });
+
+    // Run FFmpeg conversion
+    await execAsync(
+      `ffmpeg -y -i "${webmFile}" -c:v libx264 -preset slow -crf 17 -c:a aac -b:a 192k "${mp4Path}"`,
+      {
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+        shell: true,
+      }
+    );
+
+    // Delete the original WebM file after successful conversion
+    fs.unlinkSync(webmFile);
+    activeConversions.delete(webmFile);
+    conversionQueue.delete(webmFile);
+
+    return { success: true, outputFile: mp4Path };
+  } catch (error) {
+    activeConversions.delete(webmFile);
+    conversionQueue.delete(webmFile);
+    throw error;
+  }
+}
+
+// Add function to get conversion progress
+async function getConversionProgress(webmFile) {
+  try {
+    if (!activeConversions.has(webmFile)) {
+      return 0;
+    }
+
+    const conversion = activeConversions.get(webmFile);
+    const mp4Path = conversion.mp4Path;
+
+    // Check if MP4 file exists
+    if (!fs.existsSync(mp4Path)) {
+      return 0;
+    }
+
+    // Get current MP4 size
+    const mp4Size = fs.statSync(mp4Path).size;
+
+    // WebM is typically larger than MP4, so we use a factor of 0.7 to estimate final size
+    const estimatedFinalSize = conversion.webmSize * 0.7;
+
+    // Calculate progress as a percentage, capped at 99%
+    const progress = Math.min(Math.round((mp4Size / estimatedFinalSize) * 100), 99);
+    return progress;
+  } catch (error) {
+    console.error('Error calculating conversion progress:', error);
+    return 0;
+  }
+}
+
+// Modify the /stop endpoint to not convert
 app.post('/stop', async (req, res) => {
   const stopTime = Date.now();
   try {
     const { streamId } = req.body;
     log(`Stopping recording for stream ${streamId}`);
-
-    // Add debug logging for recorders Map
-    log(`Current active recorders:`, {
-      recorderIds: Array.from(recorders.keys()),
-      requestedId: streamId,
-    });
 
     const recorder = recorders.get(streamId);
     if (!recorder) {
@@ -496,28 +618,18 @@ app.post('/stop', async (req, res) => {
 
       recorders.delete(streamId);
 
-      // Convert WebM to MP4 automatically after stopping
-      log('Converting WebM to MP4...');
-      const mp4Path = outputFile.replace('.webm', '.mp4');
-      await execAsync(
-        `ffmpeg -i "${outputFile}" -c:v libx264 -preset slow -crf 17 -c:a aac -b:a 192k "${mp4Path}"`
-      );
-
-      // Delete the original WebM file after successful conversion
-      fs.unlinkSync(outputFile);
-
       const duration = stopTime - startTime;
-      log(`Recording stopped and converted successfully`, {
+      log(`Recording stopped successfully`, {
         streamId,
         duration,
-        outputFile: mp4Path,
+        outputFile,
       });
 
       res.json({
         success: true,
         status: 'completed',
         duration,
-        outputFile: mp4Path,
+        outputFile,
       });
     } catch (error) {
       log('Error during stop process, attempting cleanup...', { error: error.message });
@@ -526,13 +638,12 @@ app.post('/stop', async (req, res) => {
         if (page) await page.close();
         if (browser) await browser.close();
         if (fileStream) fileStream.end();
-        
-        // Update stream state even if there's an error
+
         const configStream = config.streams.find(s => s.url === recorder.url);
         if (configStream) {
           updateStreamRecordingState(configStream.id, null);
         }
-        
+
         recorders.delete(streamId);
         log('Cleanup completed after error');
       } catch (cleanupError) {
@@ -550,6 +661,97 @@ app.post('/stop', async (req, res) => {
       error: error.message,
       status: 'error',
     });
+  }
+});
+
+// Add endpoint to get unprocessed recordings
+app.get('/recordings/unprocessed', async (req, res) => {
+  try {
+    const files = fs
+      .readdirSync(RECORDINGS_DIR)
+      .filter(file => file.endsWith('.webm'))
+      .map(file => {
+        const filePath = join(RECORDINGS_DIR, file);
+        const stats = fs.statSync(filePath);
+        const inQueue = conversionQueue.has(filePath);
+        const isConverting = activeConversions.has(filePath);
+        let progress = 0;
+
+        if (isConverting) {
+          progress = getConversionProgress(filePath);
+        }
+
+        return {
+          name: file,
+          size: stats.size,
+          createdAt: stats.birthtime,
+          status: isConverting ? 'converting' : inQueue ? 'queued' : 'pending',
+          progress: progress,
+        };
+      });
+
+    res.json(files);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add endpoint to start conversion
+app.post('/recordings/convert', async (req, res) => {
+  try {
+    const { filename } = req.body;
+    const filePath = join(RECORDINGS_DIR, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    if (activeConversions.has(filePath)) {
+      return res.status(400).json({ error: 'File is already being converted' });
+    }
+
+    if (conversionQueue.has(filePath)) {
+      return res.status(400).json({ error: 'File is already queued for conversion' });
+    }
+
+    // Add to queue
+    conversionQueue.set(filePath, true);
+
+    // Start conversion process
+    startConversion(filePath).catch(error => {
+      log('Conversion error:', { error: error.message, file: filename });
+    });
+
+    res.json({ success: true, message: 'Conversion started' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add endpoint to get conversion status
+app.get('/recordings/convert/status/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = join(RECORDINGS_DIR, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const isConverting = activeConversions.has(filePath);
+    const inQueue = conversionQueue.has(filePath);
+    let progress = 0;
+
+    if (isConverting) {
+      progress = await getConversionProgress(filePath);
+    }
+
+    res.json({
+      status: isConverting ? 'converting' : inQueue ? 'queued' : 'pending',
+      progress,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

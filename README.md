@@ -52,6 +52,7 @@ cd stream-recorder
 ```
 
 This script will:
+
 - Create config.json from template if it doesn't exist
 - Create necessary directories (recordings, data)
 - Build the development Docker image
@@ -67,6 +68,7 @@ This script will:
 ```
 
 This script will:
+
 - Check for Docker installation
 - Set up necessary directories and configurations
 - Build the production Docker image
@@ -84,10 +86,12 @@ This script will:
 ### Volumes
 
 1. **recordings/**: Stores all recorded videos
+
    - Mount to persist recordings between container restarts
    - Default path in container: `/usr/src/app/recordings`
 
 2. **data/**: Stores user data and application state
+
    - Contains user information and recording states
    - Default path in container: `/usr/src/app/data`
 
@@ -138,21 +142,25 @@ This script will:
 ## Container Management
 
 ### View logs:
+
 ```bash
 docker logs stream-recorder
 ```
 
 ### Stop container:
+
 ```bash
 docker stop stream-recorder
 ```
 
 ### Restart container:
+
 ```bash
 docker restart stream-recorder
 ```
 
 ### Remove container:
+
 ```bash
 docker rm -f stream-recorder
 ```
@@ -176,17 +184,20 @@ docker rm -f stream-recorder
 ## Troubleshooting
 
 1. **Permission Issues**:
+
    - Ensure the mounted volumes have correct permissions
    - The container runs as non-root user (node)
    - Check ownership of data and recordings directories
 
 2. **Recording Failures**:
+
    - Check container logs for errors
    - Verify stream URL is accessible
    - Ensure sufficient disk space
    - Check recording state in data directory
 
 3. **Authentication Issues**:
+
    - Verify JWT_SECRET is set correctly
    - Clear browser cache and cookies
    - Check user permissions in data directory

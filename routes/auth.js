@@ -8,7 +8,7 @@ const router = express.Router();
 
 // Settings storage
 let authSettings = {
-  allowSignups: true
+  allowSignups: true,
 };
 
 // Admin middleware
@@ -35,7 +35,7 @@ router.post('/signup', async (req, res) => {
 
     const user = await createUser(username, password);
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET_KEY, {
-      expiresIn: '7d'
+      expiresIn: '7d',
     });
 
     res.json({ token, user });
@@ -58,7 +58,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET_KEY, {
-      expiresIn: '7d'
+      expiresIn: '7d',
     });
 
     res.json({ token, user });
@@ -100,7 +100,7 @@ router.delete('/users/:userId', verifyToken, isAdmin, async (req, res) => {
     const { userId } = req.params;
     const users = getUsers();
     const updatedUsers = users.filter(user => user.id !== userId);
-    
+
     if (users.length === updatedUsers.length) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -118,7 +118,7 @@ router.get('/settings', verifyToken, isAdmin, (req, res) => {
 
 router.post('/settings', verifyToken, isAdmin, (req, res) => {
   const { allowSignups } = req.body;
-  
+
   if (typeof allowSignups !== 'boolean') {
     return res.status(400).json({ error: 'Invalid settings format' });
   }
@@ -127,4 +127,4 @@ router.post('/settings', verifyToken, isAdmin, (req, res) => {
   res.json(authSettings);
 });
 
-export default router; 
+export default router;

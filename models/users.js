@@ -26,18 +26,18 @@ export const getUsers = () => {
   }
 };
 
-export const saveUsers = (users) => {
+export const saveUsers = users => {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 };
 
-export const findUser = (username) => {
+export const findUser = username => {
   const users = getUsers();
   return users.find(u => u.username === username);
 };
 
 export const createUser = async (username, password) => {
   const users = getUsers();
-  
+
   if (users.find(u => u.username === username)) {
     throw new Error('Username already exists');
   }
@@ -47,12 +47,12 @@ export const createUser = async (username, password) => {
     id: Date.now().toString(),
     username,
     password: hashedPassword,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 
   users.push(user);
   saveUsers(users);
-  
+
   // Return user without password
   const { password: _, ...userWithoutPassword } = user;
   return userWithoutPassword;
@@ -68,4 +68,4 @@ export const validateUser = async (username, password) => {
   // Return user without password
   const { password: _, ...userWithoutPassword } = user;
   return userWithoutPassword;
-}; 
+};
