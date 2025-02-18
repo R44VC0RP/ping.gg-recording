@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from 'bun:test';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
@@ -43,4 +43,4 @@ describe('Docker Environment', () => {
     const dockerComposeExists = fs.existsSync(join(__dirname, 'docker-compose.yml'));
     expect(dockerComposeExists).toBe(true);
   });
-}); 
+});

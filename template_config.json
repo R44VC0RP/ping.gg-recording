@@ -1,12 +1,12 @@
 {
-    "streams": [],
-    "settings": {
-        "recordingsPath": "recordings",
-        "defaultVideoQuality": {
-            "width": 1920,
-            "height": 1080,
-            "videoBitrate": 8000000,
-            "audioBitrate": 192000
-        }
+  "streams": [],
+  "settings": {
+    "recordingsPath": "recordings",
+    "defaultVideoQuality": {
+      "width": 1920,
+      "height": 1080,
+      "videoBitrate": 8000000,
+      "audioBitrate": 192000
     }
+  }
 }
