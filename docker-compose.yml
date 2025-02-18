@@ -7,7 +7,11 @@ services:
       - '3000:3000'
     volumes:
       - ./recordings:/usr/src/app/recordings
+      - ./data:/usr/src/app/data
       - ./config.json:/usr/src/app/config.json
+    environment:
+      - JWT_SECRET=your-secure-jwt-secret-change-in-production
+      - NODE_ENV=production
     restart: unless-stopped
     # Uncomment the following lines for resource limits in production
     # deploy:

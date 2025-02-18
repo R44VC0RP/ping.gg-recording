@@ -47,9 +47,10 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Set environment variables for Puppeteer
+# Set environment variables for Puppeteer and JWT
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    JWT_SECRET=your-secret-key-change-in-production
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -69,8 +70,9 @@ RUN bun install
 # Copy app source
 COPY . .
 
-# Create recordings directory
-RUN mkdir -p recordings && chown -R node:node recordings
+# Create necessary directories
+RUN mkdir -p recordings data && \
+    chown -R node:node recordings data
 
 # Switch to non-root user
 USER node

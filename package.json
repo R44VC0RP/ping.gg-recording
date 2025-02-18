@@ -10,9 +10,11 @@
     "format:check": "prettier --check '**/*.{js,json,md,yml}'"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.1",
     "express": "^4.18.2",
-    "puppeteer-stream": "^3.0.18",
+    "jsonwebtoken": "^9.0.2",
     "puppeteer": "^22.0.0",
+    "puppeteer-stream": "^3.0.18",
     "ws": "^8.17.1"
   },
   "devDependencies": {

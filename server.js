@@ -5,6 +5,8 @@ import { dirname, join } from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import authRouter from './routes/auth.js';
+import { verifyToken } from './middleware/auth.js';
 
 const execAsync = promisify(exec);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -42,7 +44,29 @@ fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
 const recorders = new Map();
 
 app.use(express.json());
+
+// Serve static files
 app.use(express.static(__dirname));
+
+// Auth routes
+app.use('/auth', authRouter);
+
+// Redirect to login if not authenticated
+app.get('/', (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) {
+    res.redirect('/login.html');
+  } else {
+    next();
+  }
+});
+
+// Protected routes
+app.use('/config', verifyToken);
+app.use('/recordings', verifyToken);
+app.use('/start', verifyToken);
+app.use('/stop', verifyToken);
+app.use('/status', verifyToken);
 
 // Get saved streams
 app.get('/config', (req, res) => {
@@ -255,6 +279,18 @@ function log(message, data = {}) {
   console.log(`[${timestamp}] ${message}`, data);
 }
 
+// Helper function to update stream recording state
+function updateStreamRecordingState(streamId, recordingState) {
+  const streamIndex = config.streams.findIndex(s => s.id === streamId);
+  if (streamIndex !== -1) {
+    config.streams[streamIndex] = {
+      ...config.streams[streamIndex],
+      recordingState
+    };
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 4));
+  }
+}
+
 app.post('/start', async (req, res) => {
   const startTime = Date.now();
   try {
@@ -262,8 +298,12 @@ app.post('/start', async (req, res) => {
     const streamId = Date.now().toString();
     log(`Starting recording for stream ${streamId}`, { url });
 
-    // Find the stream name from config
+    // Find the stream from config
     const stream = config.streams.find(s => s.url === url);
+    if (!stream) {
+      throw new Error('Stream not found in config');
+    }
+
     const streamName = stream ? stream.name : 'unnamed_stream';
 
     // Format the timestamp
@@ -325,6 +365,14 @@ app.post('/start', async (req, res) => {
     mediaStream.pipe(fileStream);
     log('Started piping media stream to file');
 
+    // Update stream recording state in config
+    updateStreamRecordingState(stream.id, {
+      isRecording: true,
+      recordingId: streamId,
+      startTime: Date.now(),
+      outputFile
+    });
+
     recorders.set(streamId, {
       browser,
       stream: mediaStream,
@@ -340,7 +388,7 @@ app.post('/start', async (req, res) => {
       streamId,
       duration: Date.now() - startTime,
     });
-    res.json({ streamId });
+    res.json({ streamId, streamId: stream.id });
   } catch (error) {
     log('Error starting recording:', {
       error: error.message,
@@ -351,24 +399,42 @@ app.post('/start', async (req, res) => {
   }
 });
 
-// Get recording status
+// Add endpoint to get stream status
 app.get('/status/:streamId', (req, res) => {
   const { streamId } = req.params;
-  const recorder = recorders.get(streamId);
+  const stream = config.streams.find(s => s.id === streamId);
 
-  if (!recorder) {
-    return res.status(404).json({ error: 'Recording not found' });
+  if (!stream) {
+    return res.status(404).json({ error: 'Stream not found' });
   }
 
-  const duration = Date.now() - recorder.startTime;
+  if (!stream.recordingState) {
+    return res.json({
+      streamId,
+      isRecording: false
+    });
+  }
+
+  const recorder = recorders.get(stream.recordingState.recordingId);
+  if (!recorder) {
+    // If recorder not found but state says recording, clean up the state
+    updateStreamRecordingState(streamId, null);
+    return res.json({
+      streamId,
+      isRecording: false
+    });
+  }
+
+  const duration = Date.now() - stream.recordingState.startTime;
   const fileSize = fs.statSync(recorder.outputFile).size;
 
   res.json({
     streamId,
-    url: recorder.url,
+    isRecording: true,
+    recordingId: stream.recordingState.recordingId,
     duration,
     fileSize,
-    isRecording: true,
+    startTime: stream.recordingState.startTime
   });
 });
 
@@ -422,6 +488,12 @@ app.post('/stop', async (req, res) => {
       if (browser) await browser.close();
       log('Browser closed');
 
+      // Find the stream in config by URL and update its recording state
+      const configStream = config.streams.find(s => s.url === recorder.url);
+      if (configStream) {
+        updateStreamRecordingState(configStream.id, null);
+      }
+
       recorders.delete(streamId);
 
       // Convert WebM to MP4 automatically after stopping
@@ -454,6 +526,13 @@ app.post('/stop', async (req, res) => {
         if (page) await page.close();
         if (browser) await browser.close();
         if (fileStream) fileStream.end();
+        
+        // Update stream state even if there's an error
+        const configStream = config.streams.find(s => s.url === recorder.url);
+        if (configStream) {
+          updateStreamRecordingState(configStream.id, null);
+        }
+        
         recorders.delete(streamId);
         log('Cleanup completed after error');
       } catch (cleanupError) {

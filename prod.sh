@@ -22,13 +22,20 @@ fi
 # Create necessary directories and files
 echo -e "${GREEN}Setting up directories and configurations...${NC}"
 
-# Create recordings directory if it doesn't exist
+# Create recordings and data directories
 mkdir -p recordings
+mkdir -p data
 
 # Check if config.json exists, if not create it from template
 if [ ! -f "config.json" ]; then
     echo -e "${YELLOW}config.json not found. Creating from template...${NC}"
     cp template_config.json config.json
+fi
+
+# Generate a random JWT secret if not provided
+if [ -z "$JWT_SECRET" ]; then
+    JWT_SECRET=$(openssl rand -hex 32)
+    echo -e "${YELLOW}Generated random JWT secret${NC}"
 fi
 
 # Stop and remove existing container if it exists
@@ -47,7 +54,10 @@ echo -e "${GREEN}Starting production container...${NC}"
 docker run -d \
     -p 3000:3000 \
     -v "$(pwd)/recordings:/usr/src/app/recordings" \
+    -v "$(pwd)/data:/usr/src/app/data" \
     -v "$(pwd)/config.json:/usr/src/app/config.json" \
+    -e JWT_SECRET="$JWT_SECRET" \
+    -e NODE_ENV=production \
     --restart unless-stopped \
     --name stream-recorder \
     stream-recorder-prod
@@ -68,4 +78,8 @@ echo -e "\n${GREEN}Useful commands:${NC}"
 echo -e "View logs: ${YELLOW}docker logs stream-recorder${NC}"
 echo -e "Stop container: ${YELLOW}docker stop stream-recorder${NC}"
 echo -e "Start container: ${YELLOW}docker start stream-recorder${NC}"
-echo -e "Remove container: ${YELLOW}docker rm -f stream-recorder${NC}" 
+echo -e "Remove container: ${YELLOW}docker rm -f stream-recorder${NC}"
+
+# Print JWT secret for safekeeping
+echo -e "\n${YELLOW}Your JWT secret is: $JWT_SECRET${NC}"
+echo -e "${YELLOW}Please save this in a secure location for future reference.${NC}" 

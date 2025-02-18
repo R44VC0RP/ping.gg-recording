@@ -13,8 +13,9 @@ if [ ! -f "config.json" ]; then
     cp template_config.json config.json
 fi
 
-# Create recordings directory if it doesn't exist
+# Create necessary directories
 mkdir -p recordings
+mkdir -p data
 
 # Stop and remove existing container if it exists
 if [ "$(docker ps -aq -f name=stream-recorder-dev)" ]; then
@@ -29,7 +30,9 @@ docker build -t stream-recorder-dev .
 echo -e "${GREEN}Starting development container...${NC}"
 docker run -p 3000:3000 \
     -v "$(pwd)/recordings:/usr/src/app/recordings" \
+    -v "$(pwd)/data:/usr/src/app/data" \
     -v "$(pwd)/config.json:/usr/src/app/config.json" \
+    -e JWT_SECRET=dev-secret-key \
     --name stream-recorder-dev \
     stream-recorder-dev
 
