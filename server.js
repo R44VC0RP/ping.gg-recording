@@ -227,18 +227,39 @@ async function saveMetadata(filename, metadata) {
   await fs.promises.writeFile(metaPath, JSON.stringify(metadata, null, 2));
 }
 
-// Update the recordings endpoint to only show MP4 files
+// Update the recordings endpoint to show both MP4 and WebM files
 app.get('/recordings', async (req, res) => {
   try {
     const files = await Promise.all(
       fs
         .readdirSync(RECORDINGS_DIR)
-        .filter(file => file.endsWith('.mp4'))
+        .filter(file => file.endsWith('.mp4') || file.endsWith('.webm'))
         .map(async file => {
           const filePath = join(RECORDINGS_DIR, file);
           const stats = fs.statSync(filePath);
           const technicalMetadata = await getVideoMetadata(filePath);
           const customMetadata = await loadMetadata(file);
+          const isWebm = file.endsWith('.webm');
+          const mp4Path = isWebm ? filePath.replace('.webm', '.mp4') : null;
+          const mp4Exists = mp4Path ? fs.existsSync(mp4Path) : false;
+
+          // Get conversion status for WebM files
+          let conversionStatus = null;
+          let conversionProgress = 0;
+          if (isWebm) {
+            const inQueue = conversionQueue.has(filePath);
+            const isConverting = activeConversions.has(filePath);
+            if (isConverting) {
+              conversionProgress = await getConversionProgress(filePath);
+            }
+            conversionStatus = mp4Exists
+              ? 'completed'
+              : isConverting
+                ? 'converting'
+                : inQueue
+                  ? 'queued'
+                  : 'pending';
+          }
 
           // If technical metadata is not available, provide basic metadata
           const metadata = {
@@ -267,6 +288,10 @@ app.get('/recordings', async (req, res) => {
             createdAt: stats.birthtime,
             url: `/recordings/${file}`,
             metadata,
+            type: isWebm ? 'webm' : 'mp4',
+            conversionStatus,
+            conversionProgress,
+            mp4Url: mp4Exists ? `/recordings/${file.replace('.webm', '.mp4')}` : null,
           };
         })
     );

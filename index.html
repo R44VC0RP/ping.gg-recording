@@ -1043,7 +1043,6 @@
         <div class="tabs">
             <div class="tab active" onclick="showTab('streams')">Active Streams</div>
             <div class="tab" onclick="showTab('recordings')">Recordings <span class="badge" id="recordings-badge">0</span></div>
-            <div class="tab" onclick="showTab('unprocessed')">To Process <span class="badge" id="unprocessed-badge">0</span></div>
             <div class="tab admin-tab" onclick="showTab('admin')" style="display: none;">Admin</div>
         </div>
 
@@ -1062,11 +1061,6 @@
         <div id="recordings-tab" style="display: none;">
             <h2>Recorded Files</h2>
             <div id="recordingsList"></div>
-        </div>
-
-        <div id="unprocessed-tab" style="display: none;">
-            <h2>Unprocessed Recordings</h2>
-            <div id="unprocessedList"></div>
         </div>
 
         <div id="admin-tab" style="display: none;">
@@ -1164,7 +1158,7 @@
             tabName = tabName || window.location.hash.slice(1) || 'streams';
 
             // Validate tab name
-            if (!['streams', 'recordings', 'unprocessed', 'admin'].includes(tabName)) {
+            if (!['streams', 'recordings', 'admin'].includes(tabName)) {
                 tabName = 'streams';
             }
 
@@ -1178,12 +1172,11 @@
             document.querySelector(`.tab:nth-child(${
                 tabName === 'streams' ? 1 : 
                 tabName === 'recordings' ? 2 : 
-                tabName === 'unprocessed' ? 3 : 4
+                3
             })`).classList.add('active');
 
             document.getElementById('streams-tab').style.display = tabName === 'streams' ? 'block' : 'none';
             document.getElementById('recordings-tab').style.display = tabName === 'recordings' ? 'block' : 'none';
-            document.getElementById('unprocessed-tab').style.display = tabName === 'unprocessed' ? 'block' : 'none';
             document.getElementById('admin-tab').style.display = tabName === 'admin' ? 'block' : 'none';
 
             // Update URL hash without triggering hashchange event
@@ -1193,8 +1186,6 @@
 
             if (tabName === 'recordings') {
                 loadRecordings();
-            } else if (tabName === 'unprocessed') {
-                loadUnprocessedRecordings();
             } else if (tabName === 'admin') {
                 loadAdminData();
             }
@@ -1555,7 +1546,7 @@
                                     <td style="min-width: 180px;">
                                         <div class="recording-thumbnail">
                                             <video preload="metadata" style="width: 100%; height: 100%; object-fit: cover;">
-                                                <source src="${recording.url}" type="video/webm">
+                                                <source src="${recording.url}" type="video/${recording.type}">
                                             </video>
                                             ${recording.metadata?.duration ? `
                                                 <div class="recording-duration">${formatDuration(recording.metadata.duration * 1000)}</div>
@@ -1588,9 +1579,38 @@
                                             <button class="primary" 
                                                 data-metadata='${JSON.stringify(recording.metadata || {}).replace(/'/g, "&#39;")}' 
                                                 onclick="toggleMetadataEdit('${recording.name}', this.dataset.metadata)">Edit Info</button>
-                                            <a href="${recording.url}" download="${recording.name}" class="success">
-                                                <button class="success">Download</button>
-                                            </a>
+                                            
+                                            ${recording.type === 'webm' ? `
+                                                <a href="${recording.url}" download="${recording.name}" class="success">
+                                                    <button class="success">Download WebM</button>
+                                                </a>
+                                                ${recording.mp4Url ? `
+                                                    <a href="${recording.mp4Url}" download="${recording.name.replace('.webm', '.mp4')}" class="success">
+                                                        <button class="success">Download MP4</button>
+                                                    </a>
+                                                ` : `
+                                                    ${recording.conversionStatus === 'converting' ? `
+                                                        <div class="conversion-status">
+                                                            <div class="progress-bar">
+                                                                <div class="progress" style="width: ${recording.conversionProgress}%"></div>
+                                                            </div>
+                                                            <span>${recording.conversionProgress.toFixed(2)}%</span>
+                                                        </div>
+                                                    ` : recording.conversionStatus === 'queued' ? `
+                                                        <button disabled class="primary">
+                                                            Queued for Conversion
+                                                        </button>
+                                                    ` : `
+                                                        <button onclick="startConversion('${recording.name}')" class="primary">
+                                                            Convert to MP4
+                                                        </button>
+                                                    `}
+                                                `}
+                                            ` : `
+                                                <a href="${recording.url}" download="${recording.name}" class="success">
+                                                    <button class="success">Download MP4</button>
+                                                </a>
+                                            `}
                                             <button onclick="deleteRecording('${recording.name}')" class="danger">Delete</button>
                                         </div>
                                     </td>
@@ -1616,7 +1636,6 @@
                     video.addEventListener('error', (e) => {
                         console.warn('Error loading video for thumbnail:', e);
                         video.style.background = '#f0f0f0';
-                        // Add a placeholder icon or text if needed
                         video.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;">Video</div>';
                     });
                 });
@@ -1909,126 +1928,6 @@
             } catch (error) {
                 console.error('Error deleting user:', error);
             }
-        }
-
-        // Add function to load unprocessed recordings
-        async function loadUnprocessedRecordings() {
-            try {
-                const response = await fetch('/recordings/unprocessed');
-                const files = await response.json();
-
-                // Update the unprocessed badge
-                const badge = document.getElementById('unprocessed-badge');
-                badge.textContent = files.length;
-
-                const list = document.getElementById('unprocessedList');
-                list.innerHTML = `
-                    <table class="recordings-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Size</th>
-                                <th>Created</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${files.map(file => `
-                                <tr id="unprocessed-${file.name}">
-                                    <td>${file.name}</td>
-                                    <td>${formatFileSize(file.size)}</td>
-                                    <td>${new Date(file.createdAt).toLocaleString()}</td>
-                                    <td>
-                                        <div class="conversion-status">
-                                            ${file.status === 'converting' ? `
-                                                <div class="progress-bar">
-                                                    <div class="progress" style="width: ${file.progress}%"></div>
-                                                </div>
-                                                <span>${file.progress.toFixed(2)}%</span>
-                                            ` : file.status}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="recording-actions">
-                                            ${file.status === 'pending' ? `
-                                                <button onclick="startConversion('${file.name}')" class="primary">
-                                                    Convert to MP4
-                                                </button>
-                                            ` : ''}
-                                            <button onclick="deleteRecording('${file.name}')" class="danger">Delete</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                `;
-
-                // Start polling for conversion status for active conversions
-                files.forEach(file => {
-                    if (file.status === 'converting' || file.status === 'queued') {
-                        pollConversionStatus(file.name);
-                    }
-                });
-            } catch (error) {
-                console.error('Error loading unprocessed recordings:', error);
-            }
-        }
-
-        // Add function to start conversion
-        async function startConversion(filename) {
-            try {
-                const response = await fetch('/recordings/convert', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filename })
-                });
-
-                if (!response.ok) throw new Error('Failed to start conversion');
-
-                // Start polling for status
-                pollConversionStatus(filename);
-                
-                // Refresh the list
-                loadUnprocessedRecordings();
-            } catch (error) {
-                console.error('Error starting conversion:', error);
-                alert('Failed to start conversion');
-            }
-        }
-
-        // Add function to poll conversion status
-        function pollConversionStatus(filename) {
-            const interval = setInterval(async () => {
-                try {
-                    const response = await fetch(`/recordings/convert/status/${filename}`);
-                    const status = await response.json();
-
-                    const row = document.getElementById(`unprocessed-${filename}`);
-                    if (!row) {
-                        clearInterval(interval);
-                        return;
-                    }
-
-                    const statusCell = row.querySelector('.conversion-status');
-                    if (status.status === 'converting') {
-                        statusCell.innerHTML = `
-                            <div class="progress-bar">
-                                <div class="progress" style="width: ${status.progress}%"></div>
-                            </div>
-                            <span>${status.progress.toFixed(2)}%</span>
-                        `;
-                    } else if (status.status === 'pending') {
-                        clearInterval(interval);
-                        loadUnprocessedRecordings();
-                        loadRecordings();
-                    }
-                } catch (error) {
-                    console.error('Error polling conversion status:', error);
-                    clearInterval(interval);
-                }
-            }, 1000);
         }
     </script>
 </body>
