@@ -14,23 +14,36 @@
 
 ## Quick Start
 
+### One-Line Deployment
+
+The fastest way to get started is to use our pre-built Docker image:
+
+```bash
+mkdir -p recordings && \
+docker run -d \
+  --name stream-recorder \
+  -p 3000:3000 \
+  -v $(pwd)/recordings:/usr/src/app/recordings \
+  -v $(pwd)/config.json:/usr/src/app/config.json \
+  mandarin3d/stream-recorder:latest
+```
+
+Then visit `http://localhost:3000` to access the recorder interface.
+
 ### Development
 
 1. Clone the repository:
-
 ```bash
 git clone <repository-url>
 cd stream-recorder
 ```
 
 2. Run the development script:
-
 ```bash
 ./dev.sh
 ```
 
 This script will:
-
 - Create config.json from template if it doesn't exist
 - Create the recordings directory
 - Build the development Docker image
@@ -40,13 +53,11 @@ This script will:
 ### Production
 
 1. Deploy using the production script:
-
 ```bash
 ./prod.sh
 ```
 
 This script will:
-
 - Check for Docker installation
 - Set up necessary directories and configurations
 - Build the production Docker image
@@ -59,7 +70,6 @@ This script will:
 ### Volumes
 
 1. **recordings/**: Stores all recorded videos
-
    - Mount to persist recordings between container restarts
    - Default path in container: `/usr/src/app/recordings`
 
@@ -94,25 +104,21 @@ This script will:
 ## Container Management
 
 ### View logs:
-
 ```bash
 docker logs stream-recorder
 ```
 
 ### Stop container:
-
 ```bash
 docker stop stream-recorder
 ```
 
 ### Restart container:
-
 ```bash
 docker restart stream-recorder
 ```
 
 ### Remove container:
-
 ```bash
 docker rm -f stream-recorder
 ```
@@ -134,12 +140,10 @@ docker rm -f stream-recorder
 ## Troubleshooting
 
 1. **Permission Issues**:
-
    - Ensure the mounted volumes have correct permissions
    - The container runs as non-root user (node)
 
 2. **Recording Failures**:
-
    - Check container logs for errors
    - Verify stream URL is accessible
    - Ensure sufficient disk space
