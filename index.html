@@ -132,6 +132,63 @@
             white-space: nowrap;
         }
 
+        .stream-url {
+            font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            color: var(--muted-foreground);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+            background: var(--muted);
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .stream-url span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .stream-url button {
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted-foreground);
+            background: none;
+            border: none;
+            box-shadow: none;
+            transition: color 0.2s;
+        }
+
+        .stream-url button:hover {
+            color: var(--accent);
+            background: none;
+        }
+
+        .url-edit-input {
+            width: 100%;
+            padding: 0.25rem 0.5rem;
+            font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--background);
+            color: var(--foreground);
+        }
+
+        .url-edit-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(219, 29, 113, 0.1);
+        }
+
         .timer {
             font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
             font-size: 12px;
@@ -160,6 +217,29 @@
             background: #dafbe1;
             color: #1a7f37;
             border-color: rgba(26, 127, 55, 0.15);
+        }
+
+        .status.processing {
+            background: #fff8c5;
+            color: #9a6700;
+            border-color: rgba(154, 103, 0, 0.15);
+        }
+
+        .status.processing::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border: 2px solid currentColor;
+            border-radius: 50%;
+            margin-right: 8px;
+            border-right-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         .status.error {
@@ -724,7 +804,7 @@
         <div class="header">
             <h1 style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent);"
             ><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 150" fill="currentColor" style="width: 60px;"><path d="M231.53,25.79A16.71,16.71,0,0,1,248.24,42.5v65a16.71,16.71,0,0,1-16.71,16.71H134.64a15.5,15.5,0,0,1-31,0H28.47A16.71,16.71,0,0,1,11.76,107.5v-65A16.71,16.71,0,0,1,28.47,25.79H231.53m0-9.76H28.47A26.49,26.49,0,0,0,2,42.5v65A26.49,26.49,0,0,0,28.47,134H96a25.25,25.25,0,0,0,46.33,0h89.23A26.49,26.49,0,0,0,258,107.5v-65A26.49,26.49,0,0,0,231.53,16ZM102.8,98.32a8.84,8.84,0,0,1-17.68,0V68.67a8.84,8.84,0,1,1,17.68,0Zm64.92-1.53a10.38,10.38,0,0,1-10.41,10.33h-.92a10.36,10.36,0,0,1-8.35-4.21l-.11-.16L128,73.93v50a8.84,8.84,0,0,1-17.68,0V52.52a10.39,10.39,0,0,1,10.34-10.41h1a10.6,10.6,0,0,1,8.44,4.37l.18.24L150,75.3v-7a8.84,8.84,0,1,1,17.68,0Zm63.81-3.68a10.49,10.49,0,0,1-5.9,9.55,44.41,44.41,0,0,1-19.93,4.84c-19,0-32.27-13.49-32.27-32.81,0-19.1,13.48-33,32-33A38.68,38.68,0,0,1,227.34,48a8.6,8.6,0,0,1,4.12,7.34,8.44,8.44,0,0,1-8.57,8.49,8.89,8.89,0,0,1-4-1l-.33-.18a22.67,22.67,0,0,0-12.31-3.55c-9.48,0-15.14,5.8-15.14,15.52s6,15.53,15.52,15.53a22.73,22.73,0,0,0,8.08-1.45V83.64h-7.31a8.49,8.49,0,1,1,0-17H222.5a8.93,8.93,0,0,1,9,9ZM74.62,49.56C70,44.87,63.34,42.5,54.76,42.5H37.27a8.84,8.84,0,0,0-8.8,8.87V98.32a8.84,8.84,0,0,0,17.67,0V87.25h8.62c8.58,0,15.26-2.38,19.87-7.07a21.62,21.62,0,0,0,6-15.31A21.6,21.6,0,0,0,74.62,49.56ZM53.85,71.8H46.14V58h7.71c8.6,0,8.6,4.68,8.6,6.92S62.45,71.8,53.85,71.8Z"></path></svg>
-                Stream Recorder</h1>
+                <span style="color: black;">  Stream Recorder</span></h1>
             <div class="global-controls">
                 <button class="primary" onclick="startAllStreams()">Start All Streams</button>
                 <button class="danger" onclick="stopAllStreams()">Stop All Streams</button>
@@ -740,9 +820,10 @@
             <span style="font-size: 12px; color: var(--muted-foreground);">Add a new stream to record (MUST BE INSIDE AN EMBED)</span>
             <div class="form-group">
                 <input type="text" id="streamName" placeholder="Stream name">
-                <input type="url" id="streamUrl" placeholder="Stream URL">
+                <input type="url" id="streamUrl" placeholder="Stream URL (ping.gg/embed/<id>)" pattern="^https?:\/\/(www\.)?ping\.gg\/embed\/.+" oninvalid="this.setCustomValidity('URL must be in format: ping.gg/embed/<id>')" oninput="this.setCustomValidity('')">
                 <button class="primary" onclick="addStream()">Add</button>
             </div>
+            <span style="font-size: 12px; color: var(--muted-foreground); display: block; margin-top: 0.25rem;">Example: ping.gg/embed/123 or ping.gg/embed/your-stream-id</span>
 
             <div id="streamList" class="streams-grid"></div>
         </div>
@@ -889,9 +970,20 @@
             const nameInput = document.getElementById('streamName');
             const urlInput = document.getElementById('streamUrl');
             const name = nameInput.value.trim();
-            const url = urlInput.value.trim();
+            let url = urlInput.value.trim();
 
             if (!url) return;
+
+            // Ensure URL starts with ping.gg/embed/
+            if (!url.match(/^(https?:\/\/)?(www\.)?ping\.gg\/embed\/.+/)) {
+                alert('URL must be in format: ping.gg/embed/<id>');
+                return;
+            }
+
+            // Add https:// if not present
+            if (!url.startsWith('http')) {
+                url = 'https://' + url;
+            }
 
             try {
                 const response = await fetch('/config/streams', {
@@ -922,7 +1014,15 @@
             list.innerHTML = streams.map(stream => `
                 <div class="stream-card" id="stream-${stream.id}">
                     <div class="stream-header">
-                        <div class="stream-title">${stream.name || 'Untitled Stream'}</div>
+                        <div>
+                            <div class="stream-title">${stream.name || 'Untitled Stream'}</div>
+                            <div class="stream-url" id="url-container-${stream.id}">
+                                <span>${stream.url.replace(/^https?:\/\//, '')}</span>
+                                <button onclick="editStreamUrl('${stream.id}', '${stream.url.replace(/'/g, "&#39;")}')" title="Edit URL">
+                                    <i class="fas fa-pencil-alt"></i>
+                                </button>
+                            </div>
+                        </div>
                         <div class="timer" id="timer-${stream.id}">00:00:00</div>
                     </div>
                     <div class="preview-container">
@@ -944,7 +1044,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div class="status" id="status-${stream.id}">Ready</div>
                         <div class="controls-row" style="margin: 0; flex: 1; justify-content: flex-end;">
-                            <button class="success" onclick="startRecording('${stream.id}', '${stream.url}')" id="start-${stream.id}">Record</button>
+                            <button class="success" onclick="startRecording('${stream.id}', '${stream.url.replace(/'/g, "&#39;")}')" id="start-${stream.id}">Record</button>
                             <button class="danger" onclick="stopRecording('${stream.id}')" id="stop-${stream.id}" style="display: none;">Stop</button>
                             <button class="danger" onclick="removeStream('${stream.id}')" id="remove-${stream.id}">Delete</button>
                         </div>
@@ -1013,21 +1113,30 @@
                 // Get the recording ID from the stop button's data attribute
                 const recordingId = stopBtn.dataset.recordingId;
 
-                await fetch('/stop', {
+                // Update status to show processing
+                statusEl.textContent = 'Processing...';
+                statusEl.className = 'status processing';
+                stopBtn.disabled = true;
+
+                const response = await fetch('/stop', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ streamId: recordingId })
                 });
 
+                if (!response.ok) throw new Error('Failed to stop recording');
+
                 statusEl.textContent = 'Ready';
                 statusEl.className = 'status';
                 startBtn.style.display = 'inline-block';
                 stopBtn.style.display = 'none';
+                stopBtn.disabled = false;
 
                 stopTimer(streamId);
             } catch (error) {
                 statusEl.textContent = `Error: ${error.message}`;
                 statusEl.className = 'status error';
+                stopBtn.disabled = false;
             }
         }
 
@@ -1105,7 +1214,9 @@
                                             <button class="primary" 
                                                 data-metadata='${JSON.stringify(recording.metadata || {}).replace(/'/g, "&#39;")}' 
                                                 onclick="toggleMetadataEdit('${recording.name}', this.dataset.metadata)">Edit Info</button>
-                                            <button onclick="downloadAsMP4('${recording.name}')" class="success">Download MP4</button>
+                                            <a href="${recording.url}" download="${recording.name}" class="success">
+                                                <button class="success">Download</button>
+                                            </a>
                                             <button onclick="deleteRecording('${recording.name}')" class="danger">Delete</button>
                                         </div>
                                     </td>
@@ -1196,26 +1307,6 @@
             return `${mbps} Mbps`;
         }
 
-        async function downloadAsMP4(filename) {
-            try {
-                const response = await fetch(`/recordings/${filename}/convert`);
-                if (!response.ok) throw new Error('Conversion failed');
-
-                const { url } = await response.json();
-
-                // Create a temporary link and click it to start the download
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename.replace('.webm', '.mp4');
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (error) {
-                console.error('Error converting to MP4:', error);
-                alert('Failed to convert to MP4');
-            }
-        }
-
         function previewRecording(name, url) {
             const modal = document.getElementById('preview-modal');
             const video = document.getElementById('preview-video');
@@ -1223,6 +1314,7 @@
 
             // Set the video source and title
             video.querySelector('source').src = url;
+            video.querySelector('source').type = 'video/mp4';  // Update to MP4
             video.load(); // Reload the video with new source
             title.textContent = name;
 
@@ -1294,6 +1386,63 @@
                 console.error('Error updating metadata:', error);
                 alert('Failed to update metadata');
             }
+        }
+
+        function editStreamUrl(streamId, currentUrl) {
+            const container = document.getElementById(`url-container-${streamId}`);
+            const originalContent = container.innerHTML;
+            
+            // Clear the container
+            container.innerHTML = '';
+            
+            // Create input element
+            const input = document.createElement('input');
+            input.type = 'url';
+            input.className = 'url-edit-input';
+            input.value = currentUrl;
+            
+            // Add event listeners
+            input.addEventListener('keydown', async (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const newUrl = input.value;
+                    try {
+                        const response = await fetch(`/config/streams/${streamId}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url: newUrl })
+                        });
+
+                        if (!response.ok) throw new Error('Failed to update stream URL');
+
+                        // Update the stream in our local array
+                        const streamIndex = streams.findIndex(s => s.id === streamId);
+                        if (streamIndex !== -1) {
+                            streams[streamIndex].url = newUrl;
+                            renderStreams();
+                        }
+                    } catch (error) {
+                        console.error('Error updating stream URL:', error);
+                        container.innerHTML = originalContent;
+                    }
+                } else if (event.key === 'Escape') {
+                    container.innerHTML = originalContent;
+                }
+            });
+
+            input.addEventListener('blur', () => {
+                // Small delay to allow Enter keypress to be processed
+                setTimeout(() => {
+                    if (document.activeElement !== input) {
+                        container.innerHTML = originalContent;
+                    }
+                }, 200);
+            });
+            
+            // Add input to container and focus it
+            container.appendChild(input);
+            input.focus();
+            input.select();
         }
     </script>
 </body>
