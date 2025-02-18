@@ -60,8 +60,11 @@ COPY package*.json ./
 # Copy template config
 COPY template_config.json ./config.json
 
+# Install Bun
+RUN npm install -g bun
+
 # Install dependencies
-RUN npm install
+RUN bun install
 
 # Copy app source
 COPY . .
@@ -76,4 +79,4 @@ USER node
 EXPOSE 3000
 
 # Start the application
-CMD [ "npm", "start" ] 
+CMD [ "bun", "start" ] 
