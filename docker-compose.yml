@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   stream-recorder:
-    build: .
+    image: mandarin3d/stream-recorder:latest
     ports:
       - '3000:3000'
     volumes:
